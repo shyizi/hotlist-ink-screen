@@ -24,8 +24,11 @@
 - 每页条数
 - 推送间隔
 
-进入你的仓库 → Settings → Secrets and variables → Actions → New repository secret
+进入你的仓库 → Settings →
+Secrets and variables → 
+Actions → 
+New repository secret
 添加三个：
-DEVICE_ID
-API_KEY
-PAGE_ID
+- DEVICE_ID  你的设备MAC码
+- API_KEY  AI便贴贴网上申请的API
+- PAGE_ID  推送到第几页
