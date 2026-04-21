@@ -83,23 +83,25 @@ def create_image(lines, title):
     draw = ImageDraw.Draw(img)
     padding = 14
 
-    # 字体加载（支持多种字体路径）
+  # 字体加载（优先使用项目中的 font.ttf）
+def load_font(size):
     font_paths = [
-        "font.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/System/Library/Fonts/PingFang.ttc",
-        "C:\\Windows\\Fonts\\simhei.ttf"
+        "font.ttf",  # 项目自带
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",  # GitHub Actions
+        "/System/Library/Fonts/PingFang.ttc",  # macOS
+        "C:\\Windows\\Fonts\\simhei.ttf",  # Windows
     ]
-    
-    font_title = None
-    font_date = None
-    font_text = None
-    
-    for font_path in font_paths:
-      try:
-    font = ImageFont.truetype("font.ttf", 26)
-    except:
-       font = ImageFont.load_default()
+    for path in font_paths:
+        try:
+            return ImageFont.truetype(path, size)
+        except:
+            continue
+    return ImageFont.load_default()
+
+# 使用
+font_title = load_font(26)
+font_date = load_font(18)
+font_text = load_font(18)
     
 
 
