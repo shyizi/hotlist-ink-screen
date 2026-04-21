@@ -1,0 +1,28 @@
+name: 热榜自动推送墨水屏
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v5  # 升级到 v5
+
+      - name: 设置Python
+        uses: actions/setup-python@v6  # 升级到 v6
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install pillow requests
+
+      - name: 运行推送程序
+        env:
+          DEVICE_ID: ${{ secrets.DEVICE_ID }}
+          API_KEY: ${{ secrets.API_KEY }}
+          PAGE_ID: ${{ secrets.PAGE_ID }}
+        run: python a.py
