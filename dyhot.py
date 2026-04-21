@@ -47,6 +47,7 @@ def make_img(lines, title):
     draw = ImageDraw.Draw(im)
     pad = 14
 
+    # 优先加载仓库里的 font.ttf
     try:
         ft_title = ImageFont.truetype("font.ttf", 26)
         ft_date = ImageFont.truetype("font.ttf", 18)
@@ -78,21 +79,22 @@ def make_img(lines, title):
     return buf
 
 def push(buf):
-    url = f"https://cloud.zectrix.com/v1/devices/{DEVICE_ID}/display/image"
+    url = f"https://cloud.zectrix.com/open/v1/devices/{DEVICE_ID}/display/image"
     h = {"X-API-Key": API_KEY}
     files = {"images": ("hot.png", buf, "image/png")}
     data = {"dither": True, "pageId": str(PAGE_ID)}
     try:
         res = requests.post(url, headers=h, files=files, data=data, timeout=15)
-        print(f"推送结果: {res.status_code}")
+        print(f"推送状态码: {res.status_code}")
+        print(f"返回内容: {res.text}")
         return res.status_code == 200
-    except:
-        print("推送失败")
+    except Exception as e:
+        print(f"推送异常: {e}")
         return False
 
 def main():
     if not DEVICE_ID or not API_KEY:
-        print("请设置环境变量")
+        print("错误：请设置 DEVICE_ID 和 API_KEY 环境变量")
         return
 
     s_idx, p_idx = load_state()
@@ -108,7 +110,7 @@ def main():
         total = (len(data) + PER_PAGE - 1) // PER_PAGE
 
     lines = data[p_idx * PER_PAGE : (p_idx+1)*PER_PAGE]
-    print(f"▶ {source['name']} 第{p_idx+1}/{total}页")
+    print(f"正在推送：{source['name']} 第{p_idx+1}/{total}页")
     img = make_img(lines, source["name"])
     push(img)
 
