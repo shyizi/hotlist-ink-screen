@@ -23,3 +23,9 @@
 - 推送页码
 - 每页条数
 - 推送间隔
+
+进入你的仓库 → Settings → Secrets and variables → Actions → New repository secret
+添加三个：
+DEVICE_ID
+API_KEY
+PAGE_ID
