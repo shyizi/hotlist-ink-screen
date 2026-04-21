@@ -3,114 +3,135 @@ import requests
 from io import BytesIO
 from datetime import datetime
 import os
-import time
 
-# ====================== 【配置】 ======================
+# ====================== 配置区 ======================
 DEVICE_ID = os.getenv("DEVICE_ID", "")
 API_KEY = os.getenv("API_KEY", "")
 PAGE_ID = os.getenv("PAGE_ID", "5")
 
-PER_PAGE = 8
-INTERVAL_SECONDS = 10 * 60  # 20分钟
-
+PER_PAGE = 8  # 已改为 8 条/页
 SOURCES = [
     {"name": "抖音热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=douyinhot"},
     {"name": "头条热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=toutiaoHot"},
     {"name": "百度热搜", "url": "https://dabenshi.cn/other/api/hot.php?type=baidu"}
 ]
+
+STATE_FILE = "state.txt"
 # ====================================================
 
-current_source_idx = 0
-current_page = 0
-current_data = []
-
-def get_hot_data(source):
+# 读取上一次的进度
+def load_state():
     try:
-        resp = requests.get(source["url"], timeout=15)
-        data = resp.json()
-        if data.get("success") and isinstance(data.get("data"), list):
-            return [f"{item['index']}. {item['title']}" for item in data["data"]]
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            src_idx, p_idx = f.read().strip().split(",")
+            return int(src_idx), int(p_idx)
     except:
-        return [f"{source['name']} 加载失败"]
+        return 0, 0
 
-def create_image(lines, title):
+# 保存进度
+def save_state(src, page):
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        f.write(f"{src},{page}")
+
+# 获取热榜数据
+def get_data(source):
+    try:
+        r = requests.get(source["url"], timeout=10)
+        r.raise_for_status()
+        d = r.json()
+        if d.get("success") and isinstance(d.get("data"), list):
+            return [f"{x['index']}. {x['title']}" for x in d["data"]]
+    except:
+        return [f"{source['name']} 获取失败"]
+    return ["无数据"]
+
+# 生成图片
+def make_img(lines, title):
     W, H = 400, 300
-    img = Image.new('1', (W, H), 1)
-    draw = ImageDraw.Draw(img)
-    padding = 14
+    im = Image.new('1', (W, H), 1)
+    draw = ImageDraw.Draw(im)
+    pad = 14
 
     try:
-        font_title = ImageFont.truetype("font.ttf", 26)
-        font_date  = ImageFont.truetype("font.ttf", 18)
-        font_text  = ImageFont.truetype("font.ttf", 18)
+        ft_title = ImageFont.truetype("simhei.ttf", 26)
+        ft_date = ImageFont.truetype("simhei.ttf", 18)
+        ft_text = ImageFont.truetype("simhei.ttf", 18)
     except:
-        font_title = ImageFont.load_default(size=26)
-        font_date  = ImageFont.load_default(size=18)
-        font_text  = ImageFont.load_default(size=18)
+        ft_title = ImageFont.load_default(size=26)
+        ft_date = ImageFont.load_default(size=18)
+        ft_text = ImageFont.load_default(size=18)
 
-    title_bar_h = 48
-    draw.rectangle([0, 0, W, title_bar_h], fill=0)
+    # 标题反显
+    bar_h = 48
+    draw.rectangle([0, 0, W, bar_h], fill=0)
     date_str = datetime.now().strftime("%Y-%m-%d")
-    draw.text((padding, 8), title, font=font_title, fill=1)
-    w_date = draw.textbbox((0,0), date_str, font=font_date)[2]
-    draw.text((W - w_date - padding, 12), date_str, font=font_date, fill=1)
+    draw.text((pad, 8), title, font=ft_title, fill=1)
+    wd = draw.textbbox((0,0), date_str, ft_date)[2]
+    draw.text((W - wd - pad, 12), date_str, font=ft_date, fill=1)
 
-    border = 6
-    draw.rectangle([border, border, W-border, H-border], outline=0, width=2)
+    # 边框
+    draw.rectangle([6,6,W-6,H-6], outline=0, width=2)
 
+    # 内容 + 下划线
     y = 60
-    line_h = 26
+    lh = 26
     for line in lines:
-        draw.text((padding, y), line, font=font_text, fill=0)
-        w_line = draw.textbbox((0,0), line, font=font_text)[2]
-        draw.line([(padding, y+20), (padding + w_line, y+20)], fill=0, width=1)
-        y += line_h
+        draw.text((pad, y), line, font=ft_text, fill=0)
+        wl = draw.textbbox((0,0), line, ft_text)[2]
+        draw.line([pad, y+20, pad+wl, y+20], fill=0, width=1)
+        y += lh
 
     buf = BytesIO()
-    img.save(buf, "PNG")
+    im.save(buf, "PNG")
     buf.seek(0)
     return buf
 
-def push_image(buf):
+# 推送
+def push(buf):
     url = f"https://cloud.zectrix.com/open/v1/devices/{DEVICE_ID}/display/image"
-    headers = {"X-API-Key": API_KEY}
+    h = {"X-API-Key": API_KEY}
     files = {"images": ("hot.png", buf, "image/png")}
     data = {"dither": True, "pageId": str(PAGE_ID)}
     try:
-        res = requests.post(url, headers=headers, files=files, data=data, timeout=20)
-        print(f"推送成功：{res.status_code}")
+        res = requests.post(url, headers=h, files=files, data=data, timeout=15)
+        print(f"推送结果: {res.status_code}")
         return res.status_code == 200
     except Exception as e:
-        print("推送失败")
+        print("推送失败", e)
         return False
 
-# ====================== 【无限循环：24h 不间断】 ======================
+# 主函数（运行一次，推一页）
+def main():
+    if not DEVICE_ID or not API_KEY:
+        print("请设置环境变量")
+        return
+
+    src_idx, page_idx = load_state()
+    source = SOURCES[src_idx]
+    data = get_data(source)
+    total_page = (len(data) + PER_PAGE -1) // PER_PAGE
+
+    # 越界 = 切下一个榜单
+    if page_idx >= total_page:
+        src_idx = (src_idx +1) % len(SOURCES)
+        page_idx = 0
+        source = SOURCES[src_idx]
+        data = get_data(source)
+        total_page = (len(data) + PER_PAGE -1) // PER_PAGE
+
+    # 当前页内容
+    s = page_idx * PER_PAGE
+    e = s + PER_PAGE
+    lines = data[s:e]
+    print(f"▶ {source['name']} 第{page_idx+1}/{total_page}页")
+
+    # 推送
+    img = make_img(lines, source["name"])
+    push(img)
+
+    # 下一页
+    page_idx +=1
+    save_state(src_idx, page_idx)
+
 if __name__ == "__main__":
-    print("✅ 24小时不间断热榜推送已启动")
-    while True:
-        global current_source_idx, current_page, current_data
-        if not current_data:
-            source = SOURCES[current_source_idx]
-            current_data = get_hot_data(source)
-            current_page = 0
-            print(f"\n加载：{source['name']}")
-
-        total_page = (len(current_data) + PER_PAGE - 1) // PER_PAGE
-        if current_page >= total_page:
-            current_source_idx = (current_source_idx + 1) % 3
-            current_data = []
-            current_page = 0
-            continue
-
-        start = current_page * PER_PAGE
-        end = start + PER_PAGE
-        lines = current_data[start:end]
-        title = SOURCES[current_source_idx]['name']
-        print(f"→ {title} 第{current_page+1}/{total_page}页")
-
-        img = create_image(lines, title)
-        push_image(img)
-
-        current_page += 1
-        print(f"等待 20 分钟...")
-        time.sleep(INTERVAL_SECONDS)
+    main()
