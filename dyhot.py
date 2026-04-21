@@ -9,31 +9,27 @@ DEVICE_ID = os.getenv("DEVICE_ID", "")
 API_KEY = os.getenv("API_KEY", "")
 PAGE_ID = os.getenv("PAGE_ID", "5")
 
-PER_PAGE = 8  # 已改为 8 条/页
+PER_PAGE = 8
 SOURCES = [
     {"name": "抖音热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=douyinhot"},
     {"name": "头条热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=toutiaoHot"},
     {"name": "百度热搜", "url": "https://dabenshi.cn/other/api/hot.php?type=baidu"}
 ]
-
 STATE_FILE = "state.txt"
 # ====================================================
 
-# 读取上一次的进度
 def load_state():
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
-            src_idx, p_idx = f.read().strip().split(",")
-            return int(src_idx), int(p_idx)
+            s, p = f.read().strip().split(",")
+            return int(s), int(p)
     except:
         return 0, 0
 
-# 保存进度
-def save_state(src, page):
+def save_state(s, p):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        f.write(f"{src},{page}")
+        f.write(f"{s},{p}")
 
-# 获取热榜数据
 def get_data(source):
     try:
         r = requests.get(source["url"], timeout=10)
@@ -42,10 +38,9 @@ def get_data(source):
         if d.get("success") and isinstance(d.get("data"), list):
             return [f"{x['index']}. {x['title']}" for x in d["data"]]
     except:
-        return [f"{source['name']} 获取失败"]
+        return [f"{source['name']} 加载失败"]
     return ["无数据"]
 
-# 生成图片
 def make_img(lines, title):
     W, H = 400, 300
     im = Image.new('1', (W, H), 1)
@@ -61,18 +56,14 @@ def make_img(lines, title):
         ft_date = ImageFont.load_default(size=18)
         ft_text = ImageFont.load_default(size=18)
 
-    # 标题反显
     bar_h = 48
     draw.rectangle([0, 0, W, bar_h], fill=0)
     date_str = datetime.now().strftime("%Y-%m-%d")
     draw.text((pad, 8), title, font=ft_title, fill=1)
     wd = draw.textbbox((0,0), date_str, ft_date)[2]
     draw.text((W - wd - pad, 12), date_str, font=ft_date, fill=1)
-
-    # 边框
     draw.rectangle([6,6,W-6,H-6], outline=0, width=2)
 
-    # 内容 + 下划线
     y = 60
     lh = 26
     for line in lines:
@@ -86,9 +77,8 @@ def make_img(lines, title):
     buf.seek(0)
     return buf
 
-# 推送
 def push(buf):
-    url = f"https://cloud.zectrix.com/open/v1/devices/{DEVICE_ID}/display/image"
+    url = f"https://cloud.zectrix.com/v1/devices/{DEVICE_ID}/display/image"
     h = {"X-API-Key": API_KEY}
     files = {"images": ("hot.png", buf, "image/png")}
     data = {"dither": True, "pageId": str(PAGE_ID)}
@@ -96,42 +86,33 @@ def push(buf):
         res = requests.post(url, headers=h, files=files, data=data, timeout=15)
         print(f"推送结果: {res.status_code}")
         return res.status_code == 200
-    except Exception as e:
-        print("推送失败", e)
+    except:
+        print("推送失败")
         return False
 
-# 主函数（运行一次，推一页）
 def main():
     if not DEVICE_ID or not API_KEY:
         print("请设置环境变量")
         return
 
-    src_idx, page_idx = load_state()
-    source = SOURCES[src_idx]
+    s_idx, p_idx = load_state()
+    source = SOURCES[s_idx]
     data = get_data(source)
-    total_page = (len(data) + PER_PAGE -1) // PER_PAGE
+    total = (len(data) + PER_PAGE - 1) // PER_PAGE
 
-    # 越界 = 切下一个榜单
-    if page_idx >= total_page:
-        src_idx = (src_idx +1) % len(SOURCES)
-        page_idx = 0
-        source = SOURCES[src_idx]
+    if p_idx >= total:
+        s_idx = (s_idx + 1) % len(SOURCES)
+        p_idx = 0
+        source = SOURCES[s_idx]
         data = get_data(source)
-        total_page = (len(data) + PER_PAGE -1) // PER_PAGE
+        total = (len(data) + PER_PAGE - 1) // PER_PAGE
 
-    # 当前页内容
-    s = page_idx * PER_PAGE
-    e = s + PER_PAGE
-    lines = data[s:e]
-    print(f"▶ {source['name']} 第{page_idx+1}/{total_page}页")
-
-    # 推送
+    lines = data[p_idx * PER_PAGE : (p_idx+1)*PER_PAGE]
+    print(f"▶ {source['name']} 第{p_idx+1}/{total}页")
     img = make_img(lines, source["name"])
     push(img)
 
-    # 下一页
-    page_idx +=1
-    save_state(src_idx, page_idx)
+    save_state(s_idx, p_idx + 1)
 
 if __name__ == "__main__":
     main()
