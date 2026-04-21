@@ -11,7 +11,7 @@ API_KEY = os.getenv("API_KEY", "")
 PAGE_ID = os.getenv("PAGE_ID", "5")
 
 PER_PAGE = 8
-INTERVAL_SECONDS = 20 * 60  # 20分钟
+INTERVAL_SECONDS = 10 * 60  # 20分钟
 
 SOURCES = [
     {"name": "抖音热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=douyinhot"},
