@@ -1,174 +1,120 @@
-import requests
 from PIL import Image, ImageDraw, ImageFont
-import schedule
-import time
-import datetime
+import requests
+from io import BytesIO
+from datetime import datetime
 import os
 
-# ========== 配置项（请替换为自己的信息） ==========
-DEVICE_ID = os.getenv("DEVICE_ID", "你的设备MAC码")  # 优先从环境变量读取
-API_KEY = os.getenv("API_KEY", "你的AI便贴贴API")
-PAGE_ID = int(os.getenv("PAGE_ID", 1))  # 推送页码
-PER_PAGE = 8  # 每页显示条数
-INTERVAL = 10  # 翻页间隔（分钟）
-SCREEN_SIZE = (400, 300)  # 墨水屏分辨率
-FONT_PATH = "font.ttf"  # 字体文件路径
+# ====================== 配置区 ======================
+DEVICE_ID = os.getenv("DEVICE_ID", "")
+API_KEY = os.getenv("API_KEY", "")
+PAGE_ID = os.getenv("PAGE_ID", "5")
 
-# ========== 热榜获取函数（修复接口兼容性） ==========
-def get_douyin_hot():
-    """获取抖音热榜"""
-    try:
-        url = "https://www.douyin.com/aweme/v1/hot/search/list/"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        resp = requests.get(url, headers=headers, timeout=10)
-        data = resp.json()
-        hot_list = [item["word"] for item in data.get("data", {}).get("word_list", [])[:20]]
-        return ["抖音热榜"] + hot_list
-    except Exception as e:
-        print(f"获取抖音热榜失败: {e}")
-        return ["抖音热榜", "获取失败"]
+PER_PAGE = 8
+SOURCES = [
+    {"name": "抖音热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=douyinhot"},
+    {"name": "头条热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=toutiaoHot"},
+    {"name": "百度热搜", "url": "https://dabenshi.cn/other/api/hot.php?type=baidu"}
+]
+STATE_FILE = "state.txt"
+# ====================================================
 
-def get_toutiao_hot():
-    """获取头条热榜"""
+def load_state():
     try:
-        url = "https://www.toutiao.com/hot-event/hot-board/?origin=1"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        resp = requests.get(url, headers=headers, timeout=10)
-        data = resp.json()
-        hot_list = [item["Title"] for item in data.get("data", {}).get("board", [])[:20]]
-        return ["头条热榜"] + hot_list
-    except Exception as e:
-        print(f"获取头条热榜失败: {e}")
-        return ["头条热榜", "获取失败"]
-
-def get_baidu_hot():
-    """获取百度热搜"""
-    try:
-        url = "https://top.baidu.com/board?tab=realtimehot"
-        resp = requests.get(url, timeout=10)
-        from bs4 import BeautifulSoup  # 需额外安装: pip install beautifulsoup4
-        soup = BeautifulSoup(resp.text, "html.parser")
-        hot_list = [item.text.strip() for item in soup.select(".c-single-text-ellipsis")[:20]]
-        return ["百度热搜"] + hot_list
-    except Exception as e:
-        print(f"获取百度热搜失败: {e}")
-        return ["百度热搜", "获取失败"]
-
-# ========== 图片生成函数（修复样式/分页） ==========
-def generate_image(content_list, page_num=1):
-    """生成墨水屏图片"""
-    # 计算分页
-    start = (page_num - 1) * PER_PAGE
-    end = start + PER_PAGE
-    page_content = content_list[start:end]
-    
-    # 创建画布
-    img = Image.new("1", SCREEN_SIZE, 255)  # 1: 黑白模式, 255: 白色背景
-    draw = ImageDraw.Draw(img)
-    
-    # 加载字体（兼容不同字体大小）
-    try:
-        font_title = ImageFont.truetype(FONT_PATH, 24)
-        font_content = ImageFont.truetype(FONT_PATH, 18)
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            s, p = f.read().strip().split(",")
+            return int(s), int(p)
     except:
-        font_title = ImageFont.load_default(size=24)
-        font_content = ImageFont.load_default(size=18)
-    
-    # 绘制标题（反显）
-    title = page_content[0] if page_content else "无数据"
-    title_box = draw.textbbox((0, 0), title, font=font_title)
-    title_w = title_box[2] - title_box[0]
-    draw.rectangle((0, 0, title_w + 20, 30), fill=0)  # 黑色背景
-    draw.text((10, 0), title, font=font_title, fill=255)  # 白色文字
-    
-    # 绘制日期（右对齐）
-    date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    date_box = draw.textbbox((0, 0), date_str, font=font_content)
-    date_w = date_box[2] - date_box[0]
-    draw.text((SCREEN_SIZE[0] - date_w - 10, 0), date_str, font=font_content, fill=0)
-    
-    # 绘制内容（带下划线）
-    y = 40
-    for i, content in enumerate(page_content[1:], 1):
-        # 绘制文字
-        draw.text((10, y), f"{i}. {content}", font=font_content, fill=0)
-        # 绘制下划线
-        text_box = draw.textbbox((10, y), f"{i}. {content}", font=font_content)
-        draw.line((10, y + text_box[3] - text_box[1] + 2, text_box[2], y + text_box[3] - text_box[1] + 2), fill=0, width=1)
-        y += 30  # 行间距
-    
-    # 保存图片
-    img.save("hot_screen.png")
-    return "hot_screen.png"
+        return 0, 0
 
-# ========== 推送图片到墨水屏（修复API调用） ==========
-def push_to_screen(image_path):
-    """推送图片到Zectrix墨水屏"""
-    if not DEVICE_ID or not API_KEY:
-        print("请配置DEVICE_ID和API_KEY")
-        return False
-    
+def save_state(s, p):
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        f.write(f"{s},{p}")
+
+def get_data(source):
     try:
-        url = f"https://api.zectrix.com/v1/device/{DEVICE_ID}/push"  # 确认API地址是否正确
-        files = {"image": open(image_path, "rb")}
-        data = {
-            "api_key": API_KEY,
-            "page_id": PAGE_ID,
-            "refresh": 1
-        }
-        resp = requests.post(url, files=files, data=data, timeout=15)
-        if resp.status_code == 200:
-            print(f"推送成功: {resp.json()}")
-            return True
-        else:
-            print(f"推送失败: {resp.status_code} {resp.text}")
-            return False
+        r = requests.get(source["url"], timeout=10)
+        r.raise_for_status()
+        d = r.json()
+        if d.get("success") and isinstance(d.get("data"), list):
+            return [f"{x['index']}. {x['title']}" for x in d["data"]]
+    except:
+        return [f"{source['name']} 加载失败"]
+    return ["无数据"]
+
+def make_img(lines, title):
+    W, H = 400, 300
+    im = Image.new('1', (W, H), 1)
+    draw = ImageDraw.Draw(im)
+    pad = 14
+
+    # 优先加载仓库里的 font.ttf
+    try:
+        ft_title = ImageFont.truetype("font.ttf", 26)
+        ft_date = ImageFont.truetype("font.ttf", 18)
+        ft_text = ImageFont.truetype("font.ttf", 18)
+    except:
+        ft_title = ImageFont.load_default(size=26)
+        ft_date = ImageFont.load_default(size=18)
+        ft_text = ImageFont.load_default(size=18)
+
+    bar_h = 48
+    draw.rectangle([0, 0, W, bar_h], fill=0)
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    draw.text((pad, 8), title, font=ft_title, fill=1)
+    wd = draw.textbbox((0,0), date_str, ft_date)[2]
+    draw.text((W - wd - pad, 12), date_str, font=ft_date, fill=1)
+    draw.rectangle([6,6,W-6,H-6], outline=0, width=2)
+
+    y = 60
+    lh = 26
+    for line in lines:
+        draw.text((pad, y), line, font=ft_text, fill=0)
+        wl = draw.textbbox((0,0), line, ft_text)[2]
+        draw.line([pad, y+20, pad+wl, y+20], fill=0, width=1)
+        y += lh
+
+    buf = BytesIO()
+    im.save(buf, "PNG")
+    buf.seek(0)
+    return buf
+
+def push(buf):
+    url = f"https://cloud.zectrix.com/open/v1/devices/{DEVICE_ID}/display/image"
+    h = {"X-API-Key": API_KEY}
+    files = {"images": ("hot.png", buf, "image/png")}
+    data = {"dither": True, "pageId": str(PAGE_ID)}
+    try:
+        res = requests.post(url, headers=h, files=files, data=data, timeout=15)
+        print(f"推送状态码: {res.status_code}")
+        print(f"返回内容: {res.text}")
+        return res.status_code == 200
     except Exception as e:
         print(f"推送异常: {e}")
         return False
 
-# ========== 主逻辑（修复分页/定时） ==========
 def main():
-    """主执行函数"""
-    # 合并所有热榜
-    all_hot = []
-    all_hot.extend(get_douyin_hot())
-    all_hot.extend(get_toutiao_hot())
-    all_hot.extend(get_baidu_hot())
-    
-    # 生成并推送图片
-    total_pages = max(1, len(all_hot) // PER_PAGE + (1 if len(all_hot) % PER_PAGE else 0))
-    current_page = 1
-    
-    def run_push():
-        nonlocal current_page
-        print(f"\n=== 推送第 {current_page}/{total_pages} 页 ===")
-        img_path = generate_image(all_hot, current_page)
-        push_to_screen(img_path)
-        
-        # 翻页（循环）
-        current_page = current_page + 1 if current_page < total_pages else 1
-    
-    # 立即执行一次
-    run_push()
-    
-    # 定时任务
-    schedule.every(INTERVAL).minutes.do(run_push)
-    print(f"\n定时任务已启动，每{INTERVAL}分钟翻页一次...")
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    if not DEVICE_ID or not API_KEY:
+        print("错误：请设置 DEVICE_ID 和 API_KEY 环境变量")
+        return
+
+    s_idx, p_idx = load_state()
+    source = SOURCES[s_idx]
+    data = get_data(source)
+    total = (len(data) + PER_PAGE - 1) // PER_PAGE
+
+    if p_idx >= total:
+        s_idx = (s_idx + 1) % len(SOURCES)
+        p_idx = 0
+        source = SOURCES[s_idx]
+        data = get_data(source)
+        total = (len(data) + PER_PAGE - 1) // PER_PAGE
+
+    lines = data[p_idx * PER_PAGE : (p_idx+1)*PER_PAGE]
+    print(f"正在推送：{source['name']} 第{p_idx+1}/{total}页")
+    img = make_img(lines, source["name"])
+    push(img)
+
+    save_state(s_idx, p_idx + 1)
 
 if __name__ == "__main__":
-    # 检查依赖（补充缺失的依赖）
-    try:
-        import bs4
-    except ImportError:
-        print("安装缺失依赖: beautifulsoup4")
-        os.system("pip install beautifulsoup4")
-    
     main()
