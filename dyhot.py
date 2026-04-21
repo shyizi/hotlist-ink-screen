@@ -8,15 +8,11 @@ from io import BytesIO
 from datetime import datetime
 import time
 import schedule
-from dotenv import load_dotenv
 
-# 加载环境变量
-load_dotenv()
-
-# ====================== 配置区（优先使用环境变量）======================
-DEVICE_ID = os.getenv('DEVICE_ID', '默认设备ID')
-API_KEY = os.getenv('API_KEY', '默认API密钥')
-PAGE_ID = int(os.getenv('PAGE_ID', '5'))
+# ====================== 配置区（优先环境变量）======================
+DEVICE_ID = os.getenv("DEVICE_ID", "20:6E:F1:B5:3F:6C")
+API_KEY = os.getenv("API_KEY", "zt_68e5c0e02a9fb328d5f3faf75abbbd46")
+PAGE_ID = int(os.getenv("PAGE_ID", "5"))
 PER_PAGE = int(os.getenv("PER_PAGE", "8"))
 INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", "5"))
 
