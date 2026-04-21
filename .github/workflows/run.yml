@@ -1,36 +1,24 @@
-name: Hotboard Display
-
+# 示例工作流（.github/workflows/run.yml）
+name: 热榜推送
 on:
   schedule:
-    - cron: '*/10 * * * *'  # 改为10分钟，避免超限
-  workflow_dispatch:
+    - cron: "*/10 * * * *"  # 每10分钟执行
+  workflow_dispatch:  # 手动触发
 
 jobs:
-  run:
+  push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - name: 设置Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          
-      - name: Install system fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-wqy-microhei
-          
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          
-      - name: Run hotboard script
+          python-version: "3.9"
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+      - name: 运行脚本
         env:
           DEVICE_ID: ${{ secrets.DEVICE_ID }}
           API_KEY: ${{ secrets.API_KEY }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
-          PER_PAGE: ${{ secrets.PER_PAGE }}
-          INTERVAL_MINUTES: ${{ secrets.INTERVAL_MINUTES }}
         run: python dyhot.py
