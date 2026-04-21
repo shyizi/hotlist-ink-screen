@@ -14,9 +14,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ====================== 配置区（优先使用环境变量）======================
-DEVICE_ID = os.getenv("DEVICE_ID", "20:6E:F1:B5:3F:6C")
-API_KEY = os.getenv("API_KEY", "zt_68e5c0e02a9fb328d5f3faf75abbbd46")
-PAGE_ID = int(os.getenv("PAGE_ID", "5"))
+DEVICE_ID = os.getenv('DEVICE_ID', '默认设备ID')
+API_KEY = os.getenv('API_KEY', '默认API密钥')
+PAGE_ID = int(os.getenv('PAGE_ID', '5'))
 PER_PAGE = int(os.getenv("PER_PAGE", "8"))
 INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", "5"))
 
@@ -100,19 +100,12 @@ def create_image(lines, title):
     font_text = None
     
     for font_path in font_paths:
-        try:
-            font_title = ImageFont.truetype(font_path, 26)
-            font_date = ImageFont.truetype(font_path, 18)
-            font_text = ImageFont.truetype(font_path, 18)
-            break
-        except:
-            continue
+      try:
+    font = ImageFont.truetype("font.ttf", 26)
+    except:
+       font = ImageFont.load_default()
     
-    if font_title is None:
-        font_title = ImageFont.load_default()
-        font_date = ImageFont.load_default()
-        font_text = ImageFont.load_default()
-        logger.warning("使用默认字体")
+
 
     # 标题栏（反显）
     title_bar_h = 48
