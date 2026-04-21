@@ -1,8 +1,7 @@
 name: 热榜自动推送
-
 on:
   schedule:
-    - cron: "*/10 * * * *"  # 已改为 10 分钟
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -13,11 +12,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-
       - name: 安装依赖
         run: pip install pillow requests
-
-      - name: 运行推送
+      - name: 运行
         env:
           DEVICE_ID: ${{ secrets.DEVICE_ID }}
           API_KEY: ${{ secrets.API_KEY }}
