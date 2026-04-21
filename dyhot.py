@@ -46,9 +46,9 @@ def create_image(lines, title):
     padding = 14
 
     try:
-        font_title = ImageFont.truetype("simhei.ttf", 26)
-        font_date = ImageFont.truetype("simhei.ttf", 18)
-        font_text = ImageFont.truetype("simhei.ttf", 18)
+        font_title = ImageFont.truetype("font.ttf", 26)
+        font_date = ImageFont.truetype("font.ttf", 18)
+        font_text = ImageFont.truetype("font.ttf", 18)
     except:
         font_title = ImageFont.load_default(size=26)
         font_date = ImageFont.load_default(size=18)
