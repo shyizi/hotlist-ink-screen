@@ -25,4 +25,4 @@ jobs:
           DEVICE_ID: ${{ secrets.DEVICE_ID }}
           API_KEY: ${{ secrets.API_KEY }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
-        run: python a.py
+        run: python dyhot.py
