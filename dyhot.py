@@ -53,9 +53,9 @@ def make_img(lines, title):
     pad = 14
 
     try:
-        ft_title = ImageFont.truetype("simhei.ttf", 26)
-        ft_date = ImageFont.truetype("simhei.ttf", 18)
-        ft_text = ImageFont.truetype("simhei.ttf", 18)
+        ft_title = ImageFont.truetype("font.ttf", 26)
+        ft_date = ImageFont.truetype("font.ttf", 18)
+        ft_text = ImageFont.truetype("font.ttf", 18)
     except:
         ft_title = ImageFont.load_default(size=26)
         ft_date = ImageFont.load_default(size=18)
