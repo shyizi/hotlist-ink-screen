@@ -9,7 +9,7 @@ DEVICE_ID = os.getenv("DEVICE_ID", "")
 API_KEY = os.getenv("API_KEY", "")
 PAGE_ID = os.getenv("PAGE_ID", "5")
 
-PER_PAGE = 7
+PER_PAGE = 8
 SOURCES = [
     {"name": "抖音热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=douyinhot"},
     {"name": "头条热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=toutiaoHot"},
