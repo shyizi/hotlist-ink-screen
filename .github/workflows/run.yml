@@ -1,27 +1,19 @@
 name: 热榜自动推送
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/10 * * * *"  # 恢复每10分钟自动运行
   workflow_dispatch:
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # 关键：给Actions写入仓库的权限
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0  # 拉取完整Git历史，确保提交正常
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-
       - name: 安装依赖
         run: pip install pillow requests
-
       - name: 运行推送程序
         env:
           DEVICE_ID: ${{ secrets.DEVICE_ID }}
