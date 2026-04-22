@@ -3,7 +3,6 @@ import requests
 from io import BytesIO
 from datetime import datetime
 import os
-import subprocess
 
 # ====================== 配置区 ======================
 DEVICE_ID = os.getenv("DEVICE_ID", "")
@@ -16,29 +15,7 @@ SOURCES = [
     {"name": "头条热榜", "url": "https://dabenshi.cn/other/api/hot.php?type=toutiaoHot"},
     {"name": "百度热搜", "url": "https://dabenshi.cn/other/api/hot.php?type=baidu"}
 ]
-STATE_FILE = "state.txt"
 # ====================================================
-
-def load_state():
-    try:
-        with open(STATE_FILE, "r", encoding="utf-8") as f:
-            s, p = f.read().strip().split(",")
-            return int(s), int(p)
-    except:
-        return 0, 0
-
-def save_state(s, p):
-    with open(STATE_FILE, "w", encoding="utf-8") as f:
-        f.write(f"{s},{p}")
-    # 提交状态文件到仓库
-    try:
-        subprocess.run(["git", "config", "--global", "user.name", "github-actions"], check=True)
-        subprocess.run(["git", "config", "--global", "user.email", "actions@github.com"], check=True)
-        subprocess.run(["git", "add", STATE_FILE], check=True)
-        subprocess.run(["git", "commit", "-m", "Update state"], check=True)
-        subprocess.run(["git", "push"], check=True)
-    except Exception as e:
-        print(f"状态提交失败: {e}")
 
 def get_data(source):
     try:
@@ -95,7 +72,6 @@ def push(buf):
     try:
         res = requests.post(url, headers=h, files=files, data=data, timeout=15)
         print(f"推送状态码: {res.status_code}")
-        print(f"返回内容: {res.text}")
         return res.status_code == 200
     except Exception as e:
         print(f"推送异常: {e}")
@@ -106,24 +82,33 @@ def main():
         print("错误：请设置 DEVICE_ID 和 API_KEY 环境变量")
         return
 
-    s_idx, p_idx = load_state()
-    source = SOURCES[s_idx]
+    # 用运行次数来计数，直接取模实现循环
+    # 你可以根据实际总页数调整这个循环逻辑
+    total_pages_per_source = 7  # 50条数据 / 8条每页 ≈ 7页
+    total_pages = len(SOURCES) * total_pages_per_source
+
+    # 这里用一个简单的循环逻辑，每次运行自动+1
+    # 为了不依赖文件，我们直接按顺序循环
+    # 第一次：0%19=0 抖音第1页
+    # 第二次：1%19=1 抖音第2页
+    # ...
+    # 第7次：6%19=6 抖音第7页
+    # 第8次：7%19=7 头条第1页
+    import time
+    run_count = int(time.time() // (10 * 60)) % total_pages  # 每10分钟+1
+
+    source_idx = run_count // total_pages_per_source
+    page_idx = run_count % total_pages_per_source
+
+    source = SOURCES[source_idx]
     data = get_data(source)
-    total = (len(data) + PER_PAGE - 1) // PER_PAGE
+    start = page_idx * PER_PAGE
+    end = start + PER_PAGE
+    lines = data[start:end]
 
-    if p_idx >= total:
-        s_idx = (s_idx + 1) % len(SOURCES)
-        p_idx = 0
-        source = SOURCES[s_idx]
-        data = get_data(source)
-        total = (len(data) + PER_PAGE - 1) // PER_PAGE
-
-    lines = data[p_idx * PER_PAGE : (p_idx+1)*PER_PAGE]
-    print(f"正在推送：{source['name']} 第{p_idx+1}/{total}页")
+    print(f"正在推送：{source['name']} 第{page_idx+1}页")
     img = make_img(lines, source["name"])
     push(img)
-
-    save_state(s_idx, p_idx + 1)
 
 if __name__ == "__main__":
     main()
