@@ -3,6 +3,7 @@ import requests
 from io import BytesIO
 from datetime import datetime
 import os
+import subprocess
 
 # ====================== 配置区 ======================
 DEVICE_ID = os.getenv("DEVICE_ID", "")
@@ -29,6 +30,15 @@ def load_state():
 def save_state(s, p):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         f.write(f"{s},{p}")
+    # 提交状态文件到仓库
+    try:
+        subprocess.run(["git", "config", "--global", "user.name", "github-actions"], check=True)
+        subprocess.run(["git", "config", "--global", "user.email", "actions@github.com"], check=True)
+        subprocess.run(["git", "add", STATE_FILE], check=True)
+        subprocess.run(["git", "commit", "-m", "Update state"], check=True)
+        subprocess.run(["git", "push"], check=True)
+    except Exception as e:
+        print(f"状态提交失败: {e}")
 
 def get_data(source):
     try:
@@ -47,7 +57,6 @@ def make_img(lines, title):
     draw = ImageDraw.Draw(im)
     pad = 14
 
-    # 优先加载仓库里的 font.ttf
     try:
         ft_title = ImageFont.truetype("font.ttf", 26)
         ft_date = ImageFont.truetype("font.ttf", 18)
