@@ -202,21 +202,20 @@ if __name__ == "__main__":
     try:
         # 前置校验
         check_env()
-        print("🚀 三榜轮播推送服务已启动")
+        print("🚀 三榜轮播推送任务开始")
         print(f"🔧 配置：每页{PER_PAGE}条 | 停留{INTERVAL_MINUTES}分钟 | 数据源：{[s['name'] for s in SOURCES]}")
         
-        # 立即执行一次任务
+        # 直接执行一次任务（只推送当前页，不循环）
         job()
         
-        # 定时任务（每X分钟执行）
-        schedule.every(INTERVAL_MINUTES).minutes.do(job)
+        print("✅ 本次推送任务完成，等待下一次定时触发")
         
-        # 持续运行
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
     except KeyboardInterrupt:
-        print("\n🛑 服务已手动停止")
+        print("\n🛑 任务被手动停止")
+        exit(0)
+    except Exception as e:
+        print(f"\n💥 任务执行失败：{str(e)}")
+        exit(1)
     except Exception as e:
         print(f"\n💥 服务启动失败：{str(e)}")
         exit(1)
