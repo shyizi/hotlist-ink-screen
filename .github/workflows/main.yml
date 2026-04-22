@@ -1,0 +1,40 @@
+name: 墨水屏热榜轮播
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/10 * * * *'
+  push:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  run-hot-rank:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 运行热榜轮播程序
+        env:
+          DEVICE_ID: ${{ secrets.DEVICE_ID }}
+          API_KEY: ${{ secrets.API_KEY }}
+          PAGE_ID: 5
+          PER_PAGE: 8
+          INTERVAL_MINUTES: 10
+          FONT_PATH: font.ttf
+        run: |
+          python dyhot.py
